@@ -5,6 +5,8 @@ import javax.swing.event.MenuEvent;
 import javax.swing.event.MenuListener;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
+import javax.swing.event.TreeSelectionListener;
+import javax.swing.event.TreeSelectionEvent;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -14,6 +16,7 @@ import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.event.ActionEvent;
@@ -22,8 +25,16 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.print.PrinterException;
+import java.awt.print.PrinterJob;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -46,10 +57,16 @@ import jadx.gui.update.JadxUpdate;
 import jadx.gui.update.JadxUpdate.IUpdateCallback;
 import jadx.gui.update.data.Release;
 import jadx.gui.utils.CacheObject;
+import jadx.gui.utils.ClassFieldDetector;
 import jadx.gui.utils.Link;
 import jadx.gui.utils.NLS;
 import jadx.gui.utils.Position;
 import jadx.gui.utils.Utils;
+
+import jadx.core.codegen.CodeWriter;
+import jadx.core.xmlgen.*;
+
+
 
 import static javax.swing.KeyStroke.getKeyStroke;
 
@@ -66,6 +83,8 @@ public class MainWindow extends JFrame {
 	private static final ImageIcon ICON_OPEN = Utils.openIcon("folder");
 	private static final ImageIcon ICON_SAVE_ALL = Utils.openIcon("disk_multiple");
 	private static final ImageIcon ICON_EXPORT = Utils.openIcon("database_save");
+	private static final ImageIcon ICON_SAVE_SINGLE = Utils.openIcon("save_single");
+	private static final ImageIcon ICON_PRINT = Utils.openIcon("printer");
 	private static final ImageIcon ICON_CLOSE = Utils.openIcon("cross");
 	private static final ImageIcon ICON_SYNC = Utils.openIcon("sync");
 	private static final ImageIcon ICON_FLAT_PKG = Utils.openIcon("empty_logical_package_obj");
@@ -169,6 +188,76 @@ public class MainWindow extends JFrame {
 		initTree();
 		setTitle(DEFAULT_TITLE + " - " + file.getName());
 		runBackgroundJobs();
+	}
+
+	public void printContents() throws PrinterException {
+		PrinterJob printJob = PrinterJob.getPrinterJob();
+
+
+		ContentPanel printableContents = (ContentPanel) tabbedPane.getSelectedComponent();
+
+
+		if(printableContents instanceof CodePanel) {
+			CodePanel cp = (CodePanel) printableContents;
+			CodeArea ca = cp.getCodeArea();
+			printJob.setPrintable(ca);
+
+			if (printJob.printDialog())
+				printJob.print();
+
+		}
+        	else
+            		JOptionPane.showMessageDialog(this, notSupportedMsg("Printing") );
+
+	
+	}
+
+	public String notSupportedMsg(String action) {
+		return (new StringBuffer(action)).append(" of binary resources such as images is not yet supported.").toString();
+	}
+
+	public void saveResource() throws IOException{
+		ContentPanel savableContents = (ContentPanel) tabbedPane.getSelectedComponent();
+
+		JNode saveNode = savableContents.getNode();
+
+		JFileChooser jfc = new JFileChooser();
+
+		if (saveNode instanceof JResource) {
+			JResource res = (JResource) saveNode;
+			ResourceFile resFile = res.getResFile();
+			ResContainer resContainer = resFile.loadContent();
+			CodeWriter saveText = resContainer.getContent();
+			BufferedImage saveImg = resContainer.getImage();
+
+			jfc.setSelectedFile(new File(resContainer.getName()));
+
+			if(saveText != null || saveImg != null)
+			{
+				if(saveText != null) {
+					if(jfc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION)
+						saveText.save(jfc.getSelectedFile());
+					return;
+				}
+
+				if(saveImg != null) {
+					JOptionPane.showMessageDialog(this, notSupportedMsg("Saving") );
+					return;
+				}
+			}
+
+			JOptionPane.showMessageDialog(this, "Nothing to save");
+		}
+		else if(saveNode instanceof JClass) {
+			JClass cls = (JClass) saveNode;
+			jfc.setSelectedFile(new File(cls.getName() +".java"));
+
+			if(jfc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+				FileWriter fw = new FileWriter(jfc.getSelectedFile().getAbsolutePath());
+				fw.write(cls.getContent());
+				fw.close();
+			}
+		}
 	}
 
 	protected void resetCache() {
@@ -347,6 +436,34 @@ public class MainWindow extends JFrame {
 		exportAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("file.export_gradle"));
 		exportAction.putValue(Action.ACCELERATOR_KEY, getKeyStroke(KeyEvent.VK_E, KeyEvent.CTRL_DOWN_MASK));
 
+		Action saveSingleAction = new AbstractAction(NLS.str("file.save_single"), ICON_SAVE_SINGLE) {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				try {
+					saveResource();
+				}
+				catch(IOException ie) {
+					JOptionPane.showMessageDialog(MainWindow.this, "Error saving. Check that disk is not full and you have proper write permissions. ");
+				}
+			}
+		};
+		saveSingleAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("file.save_single"));
+		saveSingleAction.putValue(Action.ACCELERATOR_KEY, getKeyStroke(KeyEvent.VK_D, KeyEvent.CTRL_DOWN_MASK));
+
+		Action printAction = new AbstractAction(NLS.str("file.print"), ICON_PRINT) {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				try {
+					printContents();
+				} catch (PrinterException pe) {
+					JOptionPane.showMessageDialog(MainWindow.this, "Error printing: " + pe);
+				}
+			}
+		};
+		printAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("file.print"));
+		printAction.putValue(Action.ACCELERATOR_KEY, getKeyStroke(KeyEvent.VK_P, KeyEvent.CTRL_DOWN_MASK));
+
+
 		JMenu recentFiles = new JMenu(NLS.str("menu.recent_files"));
 		recentFiles.addMenuListener(new RecentFilesMenuListener(recentFiles));
 
@@ -458,6 +575,8 @@ public class MainWindow extends JFrame {
 		file.add(openAction);
 		file.add(saveAllAction);
 		file.add(exportAction);
+		file.add(saveSingleAction);
+		file.add(printAction);
 		file.addSeparator();
 		file.add(recentFiles);
 		file.addSeparator();
@@ -510,6 +629,8 @@ public class MainWindow extends JFrame {
 		toolbar.add(openAction);
 		toolbar.add(saveAllAction);
 		toolbar.add(exportAction);
+		toolbar.add(saveSingleAction);
+		toolbar.add(printAction);
 		toolbar.addSeparator();
 		toolbar.add(syncAction);
 		toolbar.add(flatPkgButton);
@@ -542,10 +663,17 @@ public class MainWindow extends JFrame {
 		treeModel = new DefaultTreeModel(treeRootNode);
 		tree = new JTree(treeModel);
 		tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+		tree.getSelectionModel().setSelectionMode(TreeSelectionModel.CONTIGUOUS_TREE_SELECTION);
+		tree.getSelectionModel().setSelectionMode(TreeSelectionModel.DISCONTIGUOUS_TREE_SELECTION);
 		tree.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				treeClickAction();
+				if ( e.getButton() == MouseEvent.BUTTON1 ) {
+					if(e.getClickCount() > 1)
+						treeClickAction();
+					//else - tree select action
+				}
+
 			}
 		});
 		tree.addKeyListener(new KeyAdapter() {
@@ -556,6 +684,34 @@ public class MainWindow extends JFrame {
 				}
 			}
 		});
+		tree.addTreeSelectionListener(new TreeSelectionListener() {
+			public void valueChanged(TreeSelectionEvent e) {
+				TreeNode selectedNode = (TreeNode) tree.getSelectionPath().getLastPathComponent();
+				// Expand tree from selected node...
+				java.util.List<TreePath> paths = new ArrayList<TreePath>();
+				determineTreePaths(selectedNode, paths); // Recursive method call...
+
+				TreePath[] treePaths = new TreePath[paths.size()];
+				Iterator<TreePath> iter = paths.iterator();
+
+				for (int i = 0; iter.hasNext(); ++i)
+				{
+					treePaths[i] = iter.next();
+				}
+
+				if (treePaths.length > 0)
+				{
+					//TreePath firstElement = treePaths[0];
+					tree.addSelectionPaths(treePaths);
+					//tree.scrollPathToVisible(firstElement);
+				}    
+
+				/*if (!node.isLeaf()) {
+					selectChildNodes(node, true);
+				}*/
+			}
+		});
+
 		tree.setCellRenderer(new DefaultTreeCellRenderer() {
 			@Override
 			public Component getTreeCellRendererComponent(JTree tree,
@@ -568,14 +724,15 @@ public class MainWindow extends JFrame {
 				return c;
 			}
 		});
+
 		tree.addTreeWillExpandListener(new TreeWillExpandListener() {
 			@Override
 			public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException {
 				TreePath path = event.getPath();
+
 				Object node = path.getLastPathComponent();
-				if (node instanceof JLoadableNode) {
+				if (node instanceof JLoadableNode)
 					((JLoadableNode) node).loadNode();
-				}
 			}
 
 			@Override
@@ -597,6 +754,23 @@ public class MainWindow extends JFrame {
 
 		setContentPane(mainPanel);
 		setTitle(DEFAULT_TITLE);
+	}
+
+	private void determineTreePaths(TreeNode currentNode, java.util.List<TreePath> paths)
+	{
+		TreePath path = new TreePath(((DefaultTreeModel) tree.getModel()).getPathToRoot(currentNode));
+		if(!ClassFieldDetector.isClassFieldNode(path.toString()))
+			paths.add(path);
+
+		// Get all of my Children
+		Enumeration<?> children = currentNode.children();
+
+		// iterate over my children
+		while (children.hasMoreElements())
+		{
+			TreeNode child = (TreeNode) children.nextElement();
+			determineTreePaths(child, paths);
+		}
 	}
 
 	public void setLocationAndPosition() {
