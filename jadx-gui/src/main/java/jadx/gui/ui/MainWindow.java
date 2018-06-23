@@ -118,6 +118,8 @@ public class MainWindow extends JFrame {
 	private transient ProgressPanel progressPane;
 	private transient BackgroundWorker backgroundWorker;
 
+	private transient java.util.List<TreePath> selectedPaths;
+
 	public MainWindow(JadxSettings settings) {
 		this.wrapper = new JadxWrapper(settings);
 		this.settings = settings;
@@ -141,6 +143,7 @@ public class MainWindow extends JFrame {
 		} else {
 			openFile(new File(settings.getFiles().get(0)));
 		}
+
 	}
 
 	private void checkForUpdate() {
@@ -217,7 +220,7 @@ public class MainWindow extends JFrame {
 	}
 
 	public void saveResource() throws IOException{
-		ContentPanel savableContents = (ContentPanel) tabbedPane.getSelectedComponent();
+		/*ContentPanel savableContents = (ContentPanel) tabbedPane.getSelectedComponent();
 
 		JNode saveNode = savableContents.getNode();
 
@@ -257,6 +260,39 @@ public class MainWindow extends JFrame {
 				fw.write(cls.getContent());
 				fw.close();
 			}
+		}*/
+
+		wrapper.clearSelect();
+
+		setExportSettings(false, false, false);
+
+		JFileChooser fileChooser = getFileChooser("file.save_all_msg");
+
+		int ret = fileChooser.showDialog(mainPanel, NLS.str("file.select"));
+
+		if (ret == JFileChooser.APPROVE_OPTION) {
+			settings.setLastSaveFilePath(fileChooser.getCurrentDirectory().getPath());
+
+			if(selectedPaths != null)
+			{
+				if(!selectedPaths.isEmpty())
+				{
+					selectedPaths.forEach((p) -> {
+						JNode node = (JNode) p.getLastPathComponent();
+
+						if(node instanceof JClass) {
+							JClass cls = (JClass) node;
+							wrapper.addSelectedClassNode(cls.getCls());
+						}
+						else if(node instanceof JResource) {
+                            				JResource res = (JResource) node;
+							wrapper.addSelectedResNode(res.getResFile());
+                        }
+					});
+				}
+			}
+
+			wrapper.saveSelect(fileChooser.getSelectedFile(), getProgressMonitor("msg.saving_sources"));
 		}
 	}
 
@@ -296,28 +332,44 @@ public class MainWindow extends JFrame {
 		}
 	}
 
-	private void saveAll(boolean export) {
-		settings.setExportAsGradleProject(export);
-		if (export) {
-			settings.setSkipSources(false);
-			settings.setSkipResources(false);
+	private void setExportSettings(boolean exp, boolean skipSrc, boolean skipRes) {
+		settings.setExportAsGradleProject(exp);
+		if (exp) {
+			settings.setSkipSources(skipSrc);
+			settings.setSkipResources(skipRes);
 		}
+	}
 
+	private JFileChooser getFileChooser(String diag) {
 		JFileChooser fileChooser = new JFileChooser();
 		fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-		fileChooser.setToolTipText(NLS.str("file.save_all_msg"));
+		fileChooser.setToolTipText(NLS.str(diag));
 
 		String currentDirectory = settings.getLastSaveFilePath();
 		if (!currentDirectory.isEmpty()) {
 			fileChooser.setCurrentDirectory(new File(currentDirectory));
 		}
 
+		return fileChooser;
+	}
+
+	private ProgressMonitor getProgressMonitor(String name) {
+		ProgressMonitor progressMonitor = new ProgressMonitor(mainPanel, NLS.str(name), "", 0, 100);
+		progressMonitor.setMillisToPopup(0);
+
+		return progressMonitor;
+	}
+
+	private void saveAll(boolean export) {
+
+		setExportSettings(export, false, false);
+
+		JFileChooser fileChooser = getFileChooser("file.save_all_msg");
+
 		int ret = fileChooser.showDialog(mainPanel, NLS.str("file.select"));
 		if (ret == JFileChooser.APPROVE_OPTION) {
 			settings.setLastSaveFilePath(fileChooser.getCurrentDirectory().getPath());
-			ProgressMonitor progressMonitor = new ProgressMonitor(mainPanel, NLS.str("msg.saving_sources"), "", 0, 100);
-			progressMonitor.setMillisToPopup(0);
-			wrapper.saveAll(fileChooser.getSelectedFile(), progressMonitor);
+			wrapper.saveAll(fileChooser.getSelectedFile(), getProgressMonitor("msg.saving_sources"));
 		}
 	}
 
@@ -671,7 +723,6 @@ public class MainWindow extends JFrame {
 				if ( e.getButton() == MouseEvent.BUTTON1 ) {
 					if(e.getClickCount() > 1)
 						treeClickAction();
-					//else - tree select action
 				}
 
 			}
@@ -704,7 +755,9 @@ public class MainWindow extends JFrame {
 					//TreePath firstElement = treePaths[0];
 					tree.addSelectionPaths(treePaths);
 					//tree.scrollPathToVisible(firstElement);
-				}    
+				}
+
+				selectedPaths = paths;
 
 				/*if (!node.isLeaf()) {
 					selectChildNodes(node, true);

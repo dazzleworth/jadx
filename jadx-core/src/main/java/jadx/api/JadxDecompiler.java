@@ -63,6 +63,8 @@ public final class JadxDecompiler {
 
 	private List<JavaClass> classes;
 	private List<ResourceFile> resources;
+	private List<ResourceFile> saveResources;
+	private List<JavaClass> saveClasses;
 
 	private BinaryXMLParser xmlParser;
 
@@ -151,11 +153,13 @@ public final class JadxDecompiler {
 		}
 	}
 
-	public ExecutorService getSaveExecutor() {
+	public ExecutorService getSaveExecutor(List<ResourceFile> resources, List<JavaClass> classes) {
+		saveResources = resources;
+		saveClasses = classes;
 		return getSaveExecutor(!args.isSkipSources(), !args.isSkipResources());
 	}
 
-	private ExecutorService getSaveExecutor(boolean saveSources, boolean saveResources) {
+	private ExecutorService getSaveExecutor(boolean ss, boolean sr) {
 		if (root == null) {
 			throw new JadxRuntimeException("No loaded files");
 		}
@@ -176,24 +180,39 @@ public final class JadxDecompiler {
 			sourcesOutDir = args.getOutDirSrc();
 			resOutDir = args.getOutDirRes();
 		}
-		if (saveSources) {
-			appendSourcesSave(executor, sourcesOutDir);
+		if (ss) {
+			if(saveClasses != null) {
+				saveClasses.forEach((clsnode) -> {
+						appendSourcesSave(executor, sourcesOutDir, clsnode);						
+				});
+			}
+			else
+				appendSourcesSave(executor, sourcesOutDir, null);
 		}
-		if (saveResources) {
-			appendResourcesSave(executor, resOutDir);
+		if (sr) {
+			if(saveResources != null) {
+				saveResources.forEach((resnode) -> {
+						appendResourcesSave(executor, resOutDir, resnode);
+				});
+			}
+			else
+				appendResourcesSave(executor, resOutDir, null);
 		}
 		return executor;
 	}
 
-	private void appendResourcesSave(ExecutorService executor, File outDir) {
+	private void appendResourcesSave(ExecutorService executor, File outDir, ResourceFile rf) {
 		for (ResourceFile resourceFile : getResources()) {
+			if(rf != null && rf != resourceFile)
+				continue;
+
 			executor.execute(new ResourcesSaver(outDir, resourceFile));
 		}
 	}
 
-	private void appendSourcesSave(ExecutorService executor, File outDir) {
+	private void appendSourcesSave(ExecutorService executor, File outDir, JavaClass jc) {
 		for (JavaClass cls : getClasses()) {
-			if (cls.getClassNode().contains(AFlag.DONT_GENERATE)) {
+			if ((jc != null && jc != cls) || cls.getClassNode().contains(AFlag.DONT_GENERATE)) {
 				continue;
 			}
 			executor.execute(() -> {
