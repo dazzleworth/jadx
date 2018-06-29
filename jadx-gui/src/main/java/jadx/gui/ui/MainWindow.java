@@ -30,6 +30,7 @@ import java.awt.print.PrinterJob;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.FileInputStream;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.fife.ui.rsyntaxtextarea.Theme;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +86,7 @@ public class MainWindow extends JFrame {
 	private static final ImageIcon ICON_SAVE_ALL = Utils.openIcon("disk_multiple");
 	private static final ImageIcon ICON_EXPORT = Utils.openIcon("database_save");
 	private static final ImageIcon ICON_SAVE_SINGLE = Utils.openIcon("save_single");
+	private static final ImageIcon ICON_SAVE_SELECTION = Utils.openIcon("save_selected");
 	private static final ImageIcon ICON_PRINT = Utils.openIcon("printer");
 	private static final ImageIcon ICON_CLOSE = Utils.openIcon("cross");
 	private static final ImageIcon ICON_SYNC = Utils.openIcon("sync");
@@ -117,6 +120,7 @@ public class MainWindow extends JFrame {
 	private transient Link updateLink;
 	private transient ProgressPanel progressPane;
 	private transient BackgroundWorker backgroundWorker;
+	private transient Theme editorTheme;
 
 	private transient java.util.List<TreePath> selectedPaths;
 
@@ -128,7 +132,14 @@ public class MainWindow extends JFrame {
 		resetCache();
 		initUI();
 		initMenuAndToolbar();
+		applySettings();
 		checkForUpdate();
+	}
+
+	private void applySettings() {
+		setFont(settings.getFont());
+		setEditorTheme(settings.getEditorThemePath());
+		loadSettings();
 	}
 
 	public void open() {
@@ -193,7 +204,8 @@ public class MainWindow extends JFrame {
 		runBackgroundJobs();
 	}
 
-	public void printContents() throws PrinterException {
+	private void printContents() throws PrinterException {
+
 		PrinterJob printJob = PrinterJob.getPrinterJob();
 
 
@@ -215,12 +227,13 @@ public class MainWindow extends JFrame {
 	
 	}
 
-	public String notSupportedMsg(String action) {
+	private String notSupportedMsg(String action) {
 		return (new StringBuffer(action)).append(" of binary resources such as images is not yet supported.").toString();
 	}
 
-	public void saveResource() throws IOException{
-		/*ContentPanel savableContents = (ContentPanel) tabbedPane.getSelectedComponent();
+	private void saveResource() throws IOException{
+
+		ContentPanel savableContents = (ContentPanel) tabbedPane.getSelectedComponent();
 
 		JNode saveNode = savableContents.getNode();
 
@@ -260,7 +273,11 @@ public class MainWindow extends JFrame {
 				fw.write(cls.getContent());
 				fw.close();
 			}
-		}*/
+		}
+
+	}
+
+	private void saveSelection() {
 
 		wrapper.clearSelect();
 
@@ -502,6 +519,17 @@ public class MainWindow extends JFrame {
 		saveSingleAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("file.save_single"));
 		saveSingleAction.putValue(Action.ACCELERATOR_KEY, getKeyStroke(KeyEvent.VK_D, KeyEvent.CTRL_DOWN_MASK));
 
+
+		Action saveSelAction = new AbstractAction(NLS.str("file.save_selected"), ICON_SAVE_SELECTION) {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				saveSelection();
+			}
+		};
+		saveSelAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("file.save_selected"));
+		saveSelAction.putValue(Action.ACCELERATOR_KEY, getKeyStroke(KeyEvent.VK_Z, KeyEvent.CTRL_DOWN_MASK));
+
+
 		Action printAction = new AbstractAction(NLS.str("file.print"), ICON_PRINT) {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -588,7 +616,7 @@ public class MainWindow extends JFrame {
 		Action logAction = new AbstractAction(NLS.str("menu.log"), ICON_LOG) {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				new LogViewer(settings).setVisible(true);
+				new LogViewer(MainWindow.this).setVisible(true);
 			}
 		};
 		logAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("menu.log"));
@@ -628,6 +656,7 @@ public class MainWindow extends JFrame {
 		file.add(saveAllAction);
 		file.add(exportAction);
 		file.add(saveSingleAction);
+		file.add(saveSelAction);
 		file.add(printAction);
 		file.addSeparator();
 		file.add(recentFiles);
@@ -682,6 +711,7 @@ public class MainWindow extends JFrame {
 		toolbar.add(saveAllAction);
 		toolbar.add(exportAction);
 		toolbar.add(saveSingleAction);
+		toolbar.add(saveSelAction);
 		toolbar.add(printAction);
 		toolbar.addSeparator();
 		toolbar.add(syncAction);
@@ -840,6 +870,26 @@ public class MainWindow extends JFrame {
 
 	public void updateFont(Font font) {
 		setFont(font);
+	}
+
+	public void setEditorTheme(String editorThemePath) {
+		try {
+			editorTheme = Theme.load(getClass().getResourceAsStream(editorThemePath));
+		} catch (Exception e) {
+			LOG.error("Can't load editor theme from classpath: {}", editorThemePath);
+			try {
+				editorTheme = Theme.load(new FileInputStream(editorThemePath));
+			} catch (Exception e2) {
+				LOG.error("Can't load editor theme from file: {}", editorThemePath);
+			}
+		}
+	}
+
+	public Theme getEditorTheme() {
+		return editorTheme;
+	}
+
+	public void loadSettings() {
 		tabbedPane.loadSettings();
 	}
 

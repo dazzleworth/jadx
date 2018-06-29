@@ -12,13 +12,19 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.stream.Stream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import say.swing.JFontChooser;
 
+import jadx.gui.ui.CodeArea;
+import jadx.gui.ui.CodeArea.EditorTheme;
 import jadx.gui.ui.MainWindow;
 import jadx.gui.utils.NLS;
+
+import static jadx.gui.utils.Utils.FONT_HACK;
+
 
 public class JadxSettingsWindow extends JDialog {
 	private static final long serialVersionUID = -1804570470377354148L;
@@ -37,6 +43,7 @@ public class JadxSettingsWindow extends JDialog {
 		this.startSettings = JadxSettingsAdapter.makeString(settings);
 
 		initUI();
+		registerBundledFonts();
 
 		setTitle(NLS.str("preferences.title"));
 		setSize(400, 550);
@@ -44,6 +51,13 @@ public class JadxSettingsWindow extends JDialog {
 		setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 		setModalityType(ModalityType.APPLICATION_MODAL);
 		pack();
+	}
+
+	public static void registerBundledFonts() {
+		GraphicsEnvironment grEnv = GraphicsEnvironment.getLocalGraphicsEnvironment();
+		if (FONT_HACK != null) {
+			grEnv.registerFont(FONT_HACK);
+		}
 	}
 
 	private void initUI() {
@@ -186,12 +200,30 @@ public class JadxSettingsWindow extends JDialog {
 					LOG.info("Selected Font : {}", font);
 					settings.setFont(font);
 					mainWindow.updateFont(font);
+					mainWindow.loadSettings();
 				}
 			}
 		});
 
+		EditorTheme[] editorThemes = CodeArea.getAllThemes();
+		final JComboBox<EditorTheme> themesCbx = new JComboBox<>(editorThemes);
+		for (EditorTheme theme: editorThemes) {
+			if (theme.getPath().equals(settings.getEditorThemePath())) {
+				themesCbx.setSelectedItem(theme);
+				break;
+			}
+		}
+		themesCbx.addActionListener(e -> {
+			int i = themesCbx.getSelectedIndex();
+			EditorTheme editorTheme = editorThemes[i];
+			settings.setEditorThemePath(editorTheme.getPath());
+			mainWindow.setEditorTheme(editorTheme.getPath());
+			mainWindow.loadSettings();
+		});
+
 		SettingsGroup other = new SettingsGroup(NLS.str("preferences.editor"));
 		other.addRow(NLS.str("preferences.font"), fontBtn);
+		other.addRow(NLS.str("preferences.theme"), themesCbx);
 		return other;
 	}
 
