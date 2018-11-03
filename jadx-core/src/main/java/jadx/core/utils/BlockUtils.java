@@ -79,9 +79,7 @@ public class BlockUtils {
 		}
 		if (b.contains(AFlag.SYNTHETIC)) {
 			List<BlockNode> s = b.getSuccessors();
-			if (s.size() == 1 && s.get(0).contains(AType.EXC_HANDLER)) {
-				return true;
-			}
+			return s.size() == 1 && s.get(0).contains(AType.EXC_HANDLER);
 		}
 		return false;
 	}
@@ -156,7 +154,10 @@ public class BlockUtils {
 	}
 
 	@Nullable
-	public static InsnNode getLastInsn(IBlock block) {
+	public static InsnNode getLastInsn(@Nullable IBlock block) {
+		if (block == null) {
+			return null;
+		}
 		List<InsnNode> insns = block.getInstructions();
 		if (insns.isEmpty()) {
 			return null;
@@ -548,5 +549,11 @@ public class BlockUtils {
 			}
 		}
 		return true;
+	}
+
+	public static List<InsnNode> collectAllInsns(List<BlockNode> blocks) {
+		List<InsnNode> insns = new ArrayList<>();
+		blocks.forEach(block -> insns.addAll(block.getInstructions()));
+		return insns;
 	}
 }

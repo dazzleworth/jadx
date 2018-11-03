@@ -89,8 +89,7 @@ public class CodeShrinker extends AbstractVisitor {
 		}
 
 		public WrapInfo checkInline(int assignPos, RegisterArg arg) {
-			if (!arg.isThis()
-					&& (assignPos >= inlineBorder || !canMove(assignPos, inlineBorder))) {
+			if (assignPos >= inlineBorder || !canMove(assignPos, inlineBorder)) {
 				return null;
 			}
 			inlineBorder = assignPos;
@@ -134,8 +133,14 @@ public class CodeShrinker extends AbstractVisitor {
 		}
 
 		private static boolean usedArgAssign(InsnNode insn, BitSet args) {
+			if (args.isEmpty()) {
+				return false;
+			}
 			RegisterArg result = insn.getResult();
-			return result != null && args.get(result.getRegNum());
+			if (result == null || result.isField()) {
+				return false;
+			}
+			return args.get(result.getRegNum());
 		}
 
 		public WrapInfo inline(int assignInsnPos, RegisterArg arg) {
@@ -208,9 +213,9 @@ public class CodeShrinker extends AbstractVisitor {
 //					continue;
 //				}
 				SSAVar sVar = arg.getSVar();
-				// allow inline only one use arg or 'this'
+				// allow inline only one use arg
 				if (sVar == null
-						|| sVar.getVariableUseCount() != 1 && !arg.isThis()
+						|| sVar.getVariableUseCount() != 1
 						|| sVar.contains(AFlag.DONT_INLINE)) {
 					continue;
 				}
@@ -255,7 +260,7 @@ public class CodeShrinker extends AbstractVisitor {
 	}
 
 	private static boolean canMoveBetweenBlocks(InsnNode assignInsn, BlockNode assignBlock,
-			BlockNode useBlock, InsnNode useInsn) {
+	                                            BlockNode useBlock, InsnNode useInsn) {
 		if (!BlockUtils.isPathExists(assignBlock, useBlock)) {
 			return false;
 		}

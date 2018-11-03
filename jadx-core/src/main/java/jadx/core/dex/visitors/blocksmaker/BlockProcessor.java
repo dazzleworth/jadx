@@ -79,7 +79,6 @@ public class BlockProcessor extends AbstractVisitor {
 
 	private static boolean removeEmptyBlock(BlockNode block) {
 		if (canRemoveBlock(block)) {
-			LOG.debug("Removing empty block: {}", block);
 			if (block.getSuccessors().size() == 1) {
 				BlockNode successor = block.getSuccessors().get(0);
 				block.getPredecessors().forEach(pred -> {
@@ -419,8 +418,9 @@ public class BlockProcessor extends AbstractVisitor {
 				boolean change = false;
 				for (Edge edge : edges) {
 					BlockNode target = edge.getTarget();
-					if (!target.contains(AFlag.SYNTHETIC)) {
-						BlockSplitter.insertBlockBetween(mth, edge.getSource(), target);
+					BlockNode source = edge.getSource();
+					if (!target.contains(AFlag.SYNTHETIC) && !source.contains(AFlag.SYNTHETIC)) {
+						BlockSplitter.insertBlockBetween(mth, source, target);
 						change = true;
 					}
 				}
@@ -454,7 +454,8 @@ public class BlockProcessor extends AbstractVisitor {
 		}
 		BlockNode exitBlock = mth.getExitBlocks().get(0);
 		if (exitBlock.getInstructions().size() != 1
-				|| exitBlock.contains(AFlag.SYNTHETIC)) {
+				|| exitBlock.contains(AFlag.SYNTHETIC)
+				|| exitBlock.contains(AType.SPLITTER_BLOCK)) {
 			return false;
 		}
 		List<BlockNode> preds = exitBlock.getPredecessors();

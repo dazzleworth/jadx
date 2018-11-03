@@ -1,5 +1,7 @@
 package jadx.core.dex.instructions;
 
+import java.util.List;
+
 import com.android.dx.io.instructions.DecodedInstruction;
 
 import jadx.core.dex.instructions.args.ArgType;
@@ -47,7 +49,6 @@ public class IfNode extends GotoNode {
 		BlockNode tmp = thenBlock;
 		thenBlock = elseBlock;
 		elseBlock = tmp;
-		target = thenBlock.getStartOffset();
 	}
 
 	public void changeCondition(IfOp op, InsnArg arg1, InsnArg arg2) {
@@ -58,25 +59,27 @@ public class IfNode extends GotoNode {
 
 	@Override
 	public void initBlocks(BlockNode curBlock) {
-		thenBlock = getBlockByOffset(target, curBlock.getSuccessors());
-		if (curBlock.getSuccessors().size() == 1) {
+		List<BlockNode> successors = curBlock.getSuccessors();
+		thenBlock = getBlockByOffset(target, successors);
+		if (successors.size() == 1) {
 			elseBlock = thenBlock;
 		} else {
-			elseBlock = selectOther(thenBlock, curBlock.getSuccessors());
+			elseBlock = selectOther(thenBlock, successors);
 		}
 	}
 
 	@Override
 	public boolean replaceTargetBlock(BlockNode origin, BlockNode replace) {
+		boolean replaced = false;
 		if (thenBlock == origin) {
 			thenBlock = replace;
-			return true;
+			replaced = true;
 		}
 		if (elseBlock == origin) {
 			elseBlock = replace;
-			return true;
+			replaced = true;
 		}
-		return false;
+		return replaced;
 	}
 
 	public BlockNode getThenBlock() {
@@ -85,6 +88,11 @@ public class IfNode extends GotoNode {
 
 	public BlockNode getElseBlock() {
 		return elseBlock;
+	}
+
+	@Override
+	public int getTarget() {
+		return thenBlock == null ? target : thenBlock.getStartOffset();
 	}
 
 	@Override
