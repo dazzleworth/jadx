@@ -69,6 +69,8 @@ import jadx.gui.utils.Utils;
 import jadx.core.codegen.CodeWriter;
 import jadx.core.xmlgen.*;
 
+import jadx.gui.ui.codearea.*;
+
 
 
 import static javax.swing.KeyStroke.getKeyStroke;

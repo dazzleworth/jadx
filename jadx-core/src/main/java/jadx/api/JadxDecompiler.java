@@ -42,7 +42,7 @@ import jadx.core.xmlgen.ResourcesSaver;
  * jadx.load();
  * jadx.save();
  * </code></pre>
- * <p/>
+ * <p>
  * Instead of 'save()' you can iterate over decompiled classes:
  * <pre><code>
  *  for(JavaClass cls : jadx.getClasses()) {
@@ -63,8 +63,6 @@ public final class JadxDecompiler {
 
 	private List<JavaClass> classes;
 	private List<ResourceFile> resources;
-	private List<ResourceFile> saveResources;
-	private List<JavaClass> saveClasses;
 
 	private BinaryXMLParser xmlParser;
 
@@ -93,7 +91,6 @@ public final class JadxDecompiler {
 
 		root.initClassPath();
 		root.loadResources(getResources());
-		root.initAppResClass();
 
 		initVisitors();
 	}
@@ -153,13 +150,11 @@ public final class JadxDecompiler {
 		}
 	}
 
-	public ExecutorService getSaveExecutor(List<ResourceFile> resources, List<JavaClass> classes) {
-		saveResources = resources;
-		saveClasses = classes;
+	public ExecutorService getSaveExecutor() {
 		return getSaveExecutor(!args.isSkipSources(), !args.isSkipResources());
 	}
 
-	private ExecutorService getSaveExecutor(boolean ss, boolean sr) {
+	private ExecutorService getSaveExecutor(boolean saveSources, boolean saveResources) {
 		if (root == null) {
 			throw new JadxRuntimeException("No loaded files");
 		}
@@ -180,39 +175,24 @@ public final class JadxDecompiler {
 			sourcesOutDir = args.getOutDirSrc();
 			resOutDir = args.getOutDirRes();
 		}
-		if (ss) {
-			if(saveClasses != null) {
-				saveClasses.forEach((clsnode) -> {
-						appendSourcesSave(executor, sourcesOutDir, clsnode);						
-				});
-			}
-			else
-				appendSourcesSave(executor, sourcesOutDir, null);
+		if (saveResources) {
+			appendResourcesSave(executor, resOutDir);
 		}
-		if (sr) {
-			if(saveResources != null) {
-				saveResources.forEach((resnode) -> {
-						appendResourcesSave(executor, resOutDir, resnode);
-				});
-			}
-			else
-				appendResourcesSave(executor, resOutDir, null);
+		if (saveSources) {
+			appendSourcesSave(executor, sourcesOutDir);
 		}
 		return executor;
 	}
 
-	private void appendResourcesSave(ExecutorService executor, File outDir, ResourceFile rf) {
+	private void appendResourcesSave(ExecutorService executor, File outDir) {
 		for (ResourceFile resourceFile : getResources()) {
-			if(rf != null && rf != resourceFile)
-				continue;
-
 			executor.execute(new ResourcesSaver(outDir, resourceFile));
 		}
 	}
 
-	private void appendSourcesSave(ExecutorService executor, File outDir, JavaClass jc) {
+	private void appendSourcesSave(ExecutorService executor, File outDir) {
 		for (JavaClass cls : getClasses()) {
-			if ((jc != null && jc != cls) || cls.getClassNode().contains(AFlag.DONT_GENERATE)) {
+			if (cls.getClassNode().contains(AFlag.DONT_GENERATE)) {
 				continue;
 			}
 			executor.execute(() -> {
@@ -283,6 +263,13 @@ public final class JadxDecompiler {
 		return root.getErrorsCounter().getErrorCount();
 	}
 
+	public int getWarnsCount() {
+		if (root == null) {
+			return 0;
+		}
+		return root.getErrorsCounter().getWarnsCount();
+	}
+
 	public void printErrorsReport() {
 		if (root == null) {
 			return;
@@ -324,8 +311,36 @@ public final class JadxDecompiler {
 		return methodsMap;
 	}
 
+	JavaMethod getJavaMethodByNode(MethodNode mth) {
+		JavaMethod javaMethod = methodsMap.get(mth);
+		if (javaMethod != null) {
+			return javaMethod;
+		}
+		// parent class not loaded yet
+		JavaClass javaClass = classesMap.get(mth.getParentClass());
+		if (javaClass != null) {
+			javaClass.decompile();
+			return methodsMap.get(mth);
+		}
+		return null;
+	}
+
 	Map<FieldNode, JavaField> getFieldsMap() {
 		return fieldsMap;
+	}
+
+	JavaField getJavaFieldByNode(FieldNode fld) {
+		JavaField javaField = fieldsMap.get(fld);
+		if (javaField != null) {
+			return javaField;
+		}
+		// parent class not loaded yet
+		JavaClass javaClass = classesMap.get(fld.getParentClass());
+		if (javaClass != null) {
+			javaClass.decompile();
+			return fieldsMap.get(fld);
+		}
+		return null;
 	}
 
 	public JadxArgs getArgs() {

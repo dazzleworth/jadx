@@ -9,13 +9,13 @@ jadx_version_file="./core.version"
 jadx_core_rep=https://github.com/skylot/jadx.git
 tmp_path=tmp
 src_path=($tmp_path "jadx-core" "src" "main" "java" "jadx")
-dest_path=("app" "src" "main" "java")
+dest_path=("jadx-core" "src" "main" "java")
 cur_commit=$(git rev-parse HEAD | cut -c1-10)
 cur_remote_commit=$(git ls-remote "$jadx_core_rep" HEAD | head -1 | cut -c1-10)
 
 if [ "$cur_remote_commit" = "$cur_commit" ] && [ ! -f $jadx_version_file ];
 then
-	echo 'You just cloned this repository. Core should be latest.'
+	echo 'You just cloned this repository. Core should be at latest.'
 	exit 0
 fi
 
@@ -50,4 +50,4 @@ rm -rf "$tmp_path"
 
 git add .
 
-git commit -m $(printf 'Upgraded JADX-core to %s...' ) #| cut -c 1-7 )
+git commit -m "$(printf 'Upgraded JADX-core to %s...' )" #| cut -c 1-7 )
