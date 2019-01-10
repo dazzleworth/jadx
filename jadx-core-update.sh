@@ -9,7 +9,7 @@ jadx_version_file="./core.version"
 jadx_core_rep=https://github.com/skylot/jadx.git
 tmp_path=tmp
 src_path=($tmp_path "jadx-core" "src" "main" "java" "jadx")
-dest_path=("jadx-core" "src" "main" "java")
+dest_path=("jadx-core" "src" "main" "java")		#different in jadx and show-java, pls pay attention and edit accordingly
 cur_commit=$(git rev-parse HEAD | cut -c1-10)
 cur_remote_commit=$(git ls-remote "$jadx_core_rep" HEAD | head -1 | cut -c1-10)
 
@@ -50,4 +50,4 @@ rm -rf "$tmp_path"
 
 git add .
 
-git commit -m "$(printf 'Upgraded JADX-core to %s...' )" #| cut -c 1-7 )
+git commit -m "$(printf 'Upgraded JADX-core to %s...' $cur_remote_commit)" #| cut -c 1-7 )
