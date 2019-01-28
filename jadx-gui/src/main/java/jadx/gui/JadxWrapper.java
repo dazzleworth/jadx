@@ -19,6 +19,7 @@ import jadx.gui.settings.JadxSettings;
 
 public class JadxWrapper {
 	private static final Logger LOG = LoggerFactory.getLogger(JadxWrapper.class);
+	private static JadxWrapper curWrapper = null;
 
 	private final JadxSettings settings;
 	private JadxDecompiler decompiler;
@@ -30,6 +31,8 @@ public class JadxWrapper {
 		this.settings = settings;
 		selectedResources = new ArrayList<ResourceFile>();
 		selectedClasses = new ArrayList<JavaClass>();
+		
+		curWrapper = this;
 	}
 
 	public void openFile(File file) {
@@ -59,7 +62,7 @@ public class JadxWrapper {
 		selectedClasses.add(cls);
 	}
 
-	public void saveSelect(final File dir, final ProgressMonitor progressMonitor) {
+	/* public void saveSelect(final File dir, final ProgressMonitor progressMonitor) {
 		Runnable save = new Runnable() {
 			@Override
 			public void run() {
@@ -82,7 +85,7 @@ public class JadxWrapper {
 		      }
         };
 		new Thread(save).start();
-	}
+	} */
 
 	public void saveAll(final File dir, final ProgressMonitor progressMonitor) {
 		Runnable save = new Runnable() {
@@ -90,7 +93,7 @@ public class JadxWrapper {
 			public void run() {
 				try {
 					decompiler.getArgs().setRootDir(dir);
-					ThreadPoolExecutor ex = (ThreadPoolExecutor) decompiler.getSaveExecutor(null, null);
+					ThreadPoolExecutor ex = (ThreadPoolExecutor) decompiler.getSaveExecutor(/* null, null */);
 					ex.shutdown();
 					while (ex.isTerminating()) {
 						long total = ex.getTaskCount();
@@ -109,6 +112,16 @@ public class JadxWrapper {
 			}
 		};
 		new Thread(save).start();
+	}
+	
+	public static List<JavaClass> getSelectedClasses() 
+	{
+		return curWrapper.selectedClasses;
+	}
+	
+	public static List<ResourceFile> getSelectedResources()
+	{
+		return curWrapper.selectedResources;
 	}
 
 	public List<JavaClass> getClasses() {

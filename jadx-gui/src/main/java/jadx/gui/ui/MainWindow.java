@@ -280,7 +280,7 @@ public class MainWindow extends JFrame {
 
 	}
 
-	private void saveSelection() {
+/* 	private void saveSelection() {
 
 		wrapper.clearSelect();
 
@@ -314,7 +314,7 @@ public class MainWindow extends JFrame {
 
 			wrapper.saveSelect(fileChooser.getSelectedFile(), getProgressMonitor("msg.saving_sources"));
 		}
-	}
+	} */
 
 	protected void resetCache() {
 		cacheObject.reset();
@@ -529,7 +529,7 @@ public class MainWindow extends JFrame {
 		Action saveSelAction = new AbstractAction(NLS.str("file.save_selected"), ICON_SAVE_SELECTION) {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				saveSelection();
+				//saveSelection();
 			}
 		};
 		saveSelAction.putValue(Action.SHORT_DESCRIPTION, NLS.str("file.save_selected"));
